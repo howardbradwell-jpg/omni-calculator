@@ -1,144 +1,228 @@
-import React, { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { Calculator, TrendingUp, ShieldCheck } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { ShieldCheck, Calculator, TrendingUp } from 'lucide-react';
 
 export default function App() {
+  // 1. Initialize State for User Inputs
   const [revenue, setRevenue] = useState(125000);
   const [expenses, setExpenses] = useState(25000);
 
-  const netProfit = Math.max(0, revenue - expenses);
-  
-  // SECA Tax (15.3% on 92.35% of earnings)
-  const seTaxable = netProfit * 0.9235;
-  const seTax = seTaxable > 0 ? seTaxable * 0.153 : 0;
-  const halfSe = seTax / 2;
+  // 2. Build the Reactive 2026 Tax Engine
+  const taxLedger = useMemo(() => {
+    const netProfit = Math.max(0, revenue - expenses);
 
-  // QBI Deduction (20% of Qualified Business Income)
-  const qbi = Math.max(0, (netProfit - halfSe) * 0.20);
-  
-  // 2026 Projected Standard Deduction
-  const standardDeduction = 15400; 
+    // --- SECA TAX (Self-Employment) ---
+    const taxableSEIncome = netProfit * 0.9235;
+    const ssTax = Math.min(taxableSEIncome, 184500) * 0.124; // 2026 SS Cap
+    const medicareTax = taxableSEIncome * 0.029;
+    const secaTax = ssTax + medicareTax;
+    const halfSEDeduction = secaTax / 2;
 
-  const taxableIncome = Math.max(0, netProfit - halfSe - qbi - standardDeduction);
+    // --- QBI DEDUCTION (Section 199A) ---
+    const qbiBase = Math.max(0, netProfit - halfSEDeduction);
+    const qbiDeduction = Math.max(0, qbiBase * 0.20);
 
-  // 2026 Marginal Brackets (Approximate Single)
-  let incomeTax = 0;
-  if (taxableIncome > 0) {
-    if (taxableIncome <= 12000) incomeTax = taxableIncome * 0.10;
-    else if (taxableIncome <= 48000) incomeTax = 1200 + (taxableIncome - 12000) * 0.12;
-    else if (taxableIncome <= 105000) incomeTax = 5520 + (taxableIncome - 48000) * 0.22;
-    else incomeTax = 18060 + (taxableIncome - 105000) * 0.24; 
-  }
+    // --- STANDARD DEDUCTION ---
+    const standardDeduction = 16100; // 2026 Single Filer
 
-  const totalTax = seTax + incomeTax;
-  const takeHome = netProfit - totalTax;
-  const taxShield = expenses + halfSe + qbi + standardDeduction;
+    // --- FEDERAL INCOME TAX ---
+    const taxableIncome = Math.max(0, netProfit - halfSEDeduction - qbiDeduction - standardDeduction);
+    
+    // 2026 Marginal Brackets Prototype
+    const brackets = [
+      { rate: 0.10, limit: 11925 },
+      { rate: 0.12, limit: 48475 },
+      { rate: 0.22, limit: 103350 },
+      { rate: 0.24, limit: 197300 }
+    ];
 
-  const chartData = [
-    { name: 'Take-Home Pay', value: takeHome, color: '#10b981' },
-    { name: 'SECA Tax (FICA)', value: seTax, color: '#f59e0b' },
-    { name: 'Fed Income Tax', value: incomeTax, color: '#3b82f6' }
-  ];
+    let federalIncomeTax = 0;
+    let remainingIncome = taxableIncome;
+    let previousLimit = 0;
 
+    for (const bracket of brackets) {
+      const taxableInBracket = Math.min(remainingIncome, bracket.limit - previousLimit);
+      if (taxableInBracket > 0) {
+        federalIncomeTax += taxableInBracket * bracket.rate;
+        remainingIncome -= taxableInBracket;
+        previousLimit = bracket.limit;
+      } else {
+        break;
+      }
+    }
+
+    const totalTaxOwed = secaTax + federalIncomeTax;
+    const netTakeHome = netProfit - totalTaxOwed;
+    
+    // Shield = Expenses + Deductions
+    const totalTaxShield = expenses + halfSEDeduction + qbiDeduction + standardDeduction;
+
+    return {
+      netProfit,
+      secaTax,
+      halfSEDeduction,
+      qbiDeduction,
+      standardDeduction,
+      federalIncomeTax,
+      totalTaxOwed,
+      netTakeHome,
+      totalTaxShield
+    };
+  }, [revenue, expenses]);
+
+  // Currency Formatter Helper
   const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
+  // Donut Chart Data Mapping
+  const chartData = [
+    { name: 'Net Take-Home', value: taxLedger.netTakeHome, color: '#10b981' }, // Emerald
+    { name: 'SECA Tax', value: taxLedger.secaTax, color: '#3b82f6' }, // Blue
+    { name: 'Federal Tax', value: taxLedger.federalIncomeTax, color: '#f59e0b' } // Amber
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 p-6 md:p-12 font-sans">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-10 text-center md:text-left">
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 flex items-center justify-center md:justify-start gap-3">
-            <Calculator className="w-8 h-8 text-indigo-600" />
-            Omni Digital Tax Engine
-          </h1>
-          <p className="text-slate-500 mt-2 font-medium">Real-time 2026 IRS 1099 Liability & QBI Modeling</p>
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <div className="flex items-center space-x-3">
+          <Calculator className="w-8 h-8 text-blue-600" />
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Omni Digital Tax Engine</h1>
+            <p className="text-slate-500 text-xs md:text-sm mt-1">Real-time 2026 IRS 1099 Liability & QBI Modeling</p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-4 space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-500" />
-                Business Metrics
-              </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Left Column: Inputs & Shield */}
+          <div className="space-y-6">
+            
+            {/* Inputs Card */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <div className="flex items-center space-x-2 mb-6">
+                <TrendingUp className="w-5 h-5 text-emerald-600" />
+                <h2 className="font-semibold text-slate-800">Business Metrics</h2>
+              </div>
+              
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-600 mb-2">Gross 1099 Revenue</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Gross 1099 Revenue</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-3 text-slate-400 font-bold">$</span>
-                    <input type="number" value={revenue} onChange={(e) => setRevenue(Number(e.target.value))} className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+                    <span className="absolute left-3 top-2 text-slate-500">$</span>
+                    <input 
+                      type="number" 
+                      value={revenue}
+                      onChange={(e) => setRevenue(Number(e.target.value))}
+                      className="w-full pl-8 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
                   </div>
                 </div>
+                
                 <div>
-                  <label className="block text-sm font-semibold text-slate-600 mb-2">Operating Expenses (Write-offs)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Operating Expenses (Write-offs)</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-3 text-slate-400 font-bold">$</span>
-                    <input type="number" value={expenses} onChange={(e) => setExpenses(Number(e.target.value))} className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all" />
+                    <span className="absolute left-3 top-2 text-slate-500">$</span>
+                    <input 
+                      type="number" 
+                      value={expenses}
+                      onChange={(e) => setExpenses(Number(e.target.value))}
+                      className="w-full pl-8 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 rounded-2xl shadow-lg text-white">
-              <div className="flex items-center gap-2 mb-2">
-                <ShieldCheck className="w-5 h-5 text-indigo-200" />
-                <h3 className="text-sm font-bold tracking-wide uppercase text-indigo-100">Total Tax Shield</h3>
+            {/* Tax Shield Card */}
+            <div className="bg-blue-600 p-6 rounded-xl shadow-sm text-white">
+              <div className="flex items-center space-x-2 mb-4">
+                <ShieldCheck className="w-5 h-5 opacity-90" />
+                <h2 className="font-semibold text-blue-50 tracking-wide text-sm">TOTAL TAX SHIELD</h2>
               </div>
-              <div className="text-3xl font-extrabold font-mono">{formatCurrency(taxShield)}</div>
-              <p className="text-indigo-200 text-sm mt-2 leading-relaxed">Money protected from federal taxes via write-offs, the 20% QBI deduction, and standard deductions.</p>
+              <div className="text-3xl font-bold mb-3">{formatCurrency(taxLedger.totalTaxShield)}</div>
+              <p className="text-blue-100 text-sm leading-relaxed">
+                Money protected from federal taxes via write-offs, the 20% QBI deduction, and standard deductions.
+              </p>
             </div>
           </div>
 
-          <div className="lg:col-span-8 space-y-6">
+          {/* Right Column: Stats & Breakdown */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Top Stat Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Net Profit</p>
-                <p className="text-2xl font-extrabold font-mono text-slate-800">{formatCurrency(netProfit)}</p>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center">
+                <div className="text-xs font-bold text-slate-500 mb-1 tracking-wider uppercase">Net Profit</div>
+                <div className="text-xl font-bold text-slate-800">{formatCurrency(taxLedger.netProfit)}</div>
               </div>
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center border-b-4 border-b-red-400">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Tax Owed</p>
-                <p className="text-2xl font-extrabold font-mono text-red-500">{formatCurrency(totalTax)}</p>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-red-100 text-center">
+                <div className="text-xs font-bold text-slate-500 mb-1 tracking-wider uppercase">Total Tax Owed</div>
+                <div className="text-xl font-bold text-red-500">{formatCurrency(taxLedger.totalTaxOwed)}</div>
               </div>
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm text-center border-b-4 border-b-emerald-400">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Net Take-Home</p>
-                <p className="text-2xl font-extrabold font-mono text-emerald-500">{formatCurrency(takeHome)}</p>
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-emerald-100 text-center">
+                <div className="text-xs font-bold text-slate-500 mb-1 tracking-wider uppercase">Net Take-Home</div>
+                <div className="text-xl font-bold text-emerald-500">{formatCurrency(taxLedger.netTakeHome)}</div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center gap-8">
+            {/* Ledger & Chart Card */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center">
+              
+              {/* Chart */}
               <div className="w-full md:w-1/2 h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={chartData} innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value">
-                      {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                    <Pie
+                      data={chartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
                     </Pie>
-                    <Tooltip formatter={(value) => formatCurrency(value)} />
+                    <Tooltip 
+                      formatter={(value) => formatCurrency(value)}
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              
-              <div className="w-full md:w-1/2 space-y-4">
+
+              {/* Ledger */}
+              <div className="w-full md:w-1/2 space-y-4 md:pl-8 mt-6 md:mt-0 w-full">
                 <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2">2026 IRS Ledger Breakdown</h3>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">SECA Tax (15.3%)</span>
-                  <span className="font-mono font-medium">{formatCurrency(seTax)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Half-SE Deduction</span>
-                  <span className="font-mono font-medium text-emerald-600">-{formatCurrency(halfSe)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">QBI Deduction (20%)</span>
-                  <span className="font-mono font-medium text-emerald-600">-{formatCurrency(qbi)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Standard Deduction</span>
-                  <span className="font-mono font-medium text-emerald-600">-{formatCurrency(standardDeduction)}</span>
-                </div>
-                <div className="flex justify-between text-sm pt-2 border-t border-slate-100">
-                  <span className="font-bold text-slate-700">Federal Income Tax</span>
-                  <span className="font-mono font-bold text-slate-800">{formatCurrency(incomeTax)}</span>
+                
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span>SECA Tax (15.3%)</span>
+                    <span className="font-medium">{formatCurrency(taxLedger.secaTax)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-emerald-600">
+                    <span>Half-SE Deduction</span>
+                    <span>-{formatCurrency(taxLedger.halfSEDeduction)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-emerald-600">
+                    <span>QBI Deduction (20%)</span>
+                    <span>-{formatCurrency(taxLedger.qbiDeduction)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-emerald-600">
+                    <span>Standard Deduction</span>
+                    <span>-{formatCurrency(taxLedger.standardDeduction)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-800 font-bold border-t border-slate-100 pt-2 mt-2">
+                    <span>Federal Income Tax</span>
+                    <span>{formatCurrency(taxLedger.federalIncomeTax)}</span>
+                  </div>
                 </div>
               </div>
+
             </div>
           </div>
         </div>
