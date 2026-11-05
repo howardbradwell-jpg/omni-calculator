@@ -3,32 +3,25 @@ import { Calculator, TrendingUp, ShieldCheck } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 export default function App() {
-  // 1. Initialize State for User Inputs
   const [revenue, setRevenue] = useState(125000);
   const [expenses, setExpenses] = useState(25000);
 
-  // 2. Build the Reactive 2026 Tax Engine
   const taxLedger = useMemo(() => {
     const netProfit = Math.max(0, revenue - expenses);
 
-    // --- SECA TAX (Self-Employment) ---
     const taxableSEIncome = netProfit * 0.9235;
-    const ssTax = Math.min(taxableSEIncome, 184500) * 0.124; // 2026 SS Cap
+    const ssTax = Math.min(taxableSEIncome, 184500) * 0.124;
     const medicareTax = taxableSEIncome * 0.029;
     const secaTax = ssTax + medicareTax;
     const halfSEDeduction = secaTax / 2;
 
-    // --- QBI DEDUCTION (Section 199A) ---
     const qbiBase = Math.max(0, netProfit - halfSEDeduction);
     const qbiDeduction = Math.max(0, qbiBase * 0.20);
 
-    // --- STANDARD DEDUCTION ---
-    const standardDeduction = 16100; // 2026 Single Filer
+    const standardDeduction = 16100;
 
-    // --- FEDERAL INCOME TAX ---
     const taxableIncome = Math.max(0, netProfit - halfSEDeduction - qbiDeduction - standardDeduction);
     
-    // 2026 Marginal Brackets Prototype
     const brackets = [
       { rate: 0.10, limit: 11925 },
       { rate: 0.12, limit: 48475 },
@@ -53,8 +46,6 @@ export default function App() {
 
     const totalTaxOwed = secaTax + federalIncomeTax;
     const netTakeHome = netProfit - totalTaxOwed;
-    
-    // Shield = Expenses + Deductions
     const totalTaxShield = expenses + halfSEDeduction + qbiDeduction + standardDeduction;
 
     return {
@@ -70,21 +61,18 @@ export default function App() {
     };
   }, [revenue, expenses]);
 
-  // Currency Formatter Helper
   const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
-  // Donut Chart Data Mapping
   const chartData = [
-    { name: 'Net Take-Home', value: taxLedger.netTakeHome, color: '#10b981' }, // Emerald
-    { name: 'SECA Tax', value: taxLedger.secaTax, color: '#3b82f6' }, // Blue
-    { name: 'Federal Tax', value: taxLedger.federalIncomeTax, color: '#f59e0b' } // Amber
+    { name: 'Net Take-Home', value: taxLedger.netTakeHome, color: '#10b981' },
+    { name: 'SECA Tax', value: taxLedger.secaTax, color: '#3b82f6' },
+    { name: 'Federal Tax', value: taxLedger.federalIncomeTax, color: '#f59e0b' }
   ];
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* Header */}
         <div className="flex items-center space-x-3">
           <Calculator className="w-8 h-8 text-blue-600" />
           <div>
@@ -94,17 +82,12 @@ export default function App() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Left Column: Inputs & Shield */}
           <div className="space-y-6">
-            
-            {/* Inputs Card */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
               <div className="flex items-center space-x-2 mb-6">
                 <TrendingUp className="w-5 h-5 text-emerald-600" />
                 <h2 className="font-semibold text-slate-800">Business Metrics</h2>
               </div>
-              
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Gross 1099 Revenue</label>
@@ -118,7 +101,6 @@ export default function App() {
                     />
                   </div>
                 </div>
-                
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Operating Expenses (Write-offs)</label>
                   <div className="relative">
@@ -134,7 +116,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Tax Shield Card */}
             <div className="bg-blue-600 p-6 rounded-xl shadow-sm text-white">
               <div className="flex items-center space-x-2 mb-4">
                 <ShieldCheck className="w-5 h-5 opacity-90" />
@@ -147,10 +128,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Column: Stats & Breakdown */}
           <div className="lg:col-span-2 space-y-6">
-            
-            {/* Top Stat Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center">
                 <div className="text-xs font-bold text-slate-500 mb-1 tracking-wider uppercase">Net Profit</div>
@@ -166,10 +144,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Ledger & Chart Card */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center">
-              
-              {/* Chart */}
               <div className="w-full md:w-1/2 h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -195,10 +170,8 @@ export default function App() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Ledger */}
-              <div className="w-full md:w-1/2 space-y-4 md:pl-8 mt-6 md:mt-0 w-full">
+              <div className="w-full md:w-1/2 space-y-4 md:pl-8 mt-6 md:mt-0">
                 <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2">2026 IRS Ledger Breakdown</h3>
-                
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between items-center text-slate-600">
                     <span>SECA Tax (15.3%)</span>
@@ -222,10 +195,25 @@ export default function App() {
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
+
+        <div className="mt-8 bg-blue-50 p-6 md:p-8 rounded-xl shadow-sm border border-blue-100 text-center">
+          <h3 className="text-xl font-bold text-slate-800 mb-2">Ready to lock in these tax savings?</h3>
+          <p className="text-slate-600 mb-6 max-w-2xl mx-auto">
+            Structuring as an LLC or S-Corp is the most effective way to shield your self-employment income from excess SECA taxes. Don't risk IRS compliance flags by filing manually.
+          </p>
+          <a 
+            href="https://www.awin1.com/cread.php?awinmid=66946&awinaffid=2775906" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors shadow-md"
+          >
+            Form Your LLC Properly Today (Sponsored Partner)
+          </a>
+        </div>
+
       </div>
     </div>
   );
