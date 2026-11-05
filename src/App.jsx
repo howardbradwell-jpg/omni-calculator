@@ -73,6 +73,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
       <div className="max-w-6xl mx-auto space-y-8">
         
+        {/* Header */}
         <div className="flex items-center space-x-3">
           <Calculator className="w-8 h-8 text-blue-600" />
           <div>
@@ -81,6 +82,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* Calculator Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -170,7 +172,7 @@ export default function App() {
                 </ResponsiveContainer>
               </div>
 
-              <div className="w-full md:w-1/2 space-y-4 md:pl-8 mt-6 md:mt-0">
+              <div className="w-full md:w-1/2 space-y-4 md:pl-8 mt-6 md:mt-0 w-full">
                 <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2">2026 IRS Ledger Breakdown</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between items-center text-slate-600">
@@ -199,6 +201,7 @@ export default function App() {
           </div>
         </div>
 
+        {/* Monetization CTA */}
         <div className="mt-8 bg-blue-50 p-6 md:p-8 rounded-xl shadow-sm border border-blue-100 text-center">
           <h3 className="text-xl font-bold text-slate-800 mb-2">Ready to lock in these tax savings?</h3>
           <p className="text-slate-600 mb-6 max-w-2xl mx-auto">
@@ -212,6 +215,34 @@ export default function App() {
           >
             Form Your LLC Properly Today (Sponsored Partner)
           </a>
+        </div>
+
+        {/* SEO & FAQ Section */}
+        <div className="mt-12 bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 text-left">
+          <h2 className="text-2xl font-bold text-slate-800 mb-6">2026 Freelance & 1099 Tax Guide</h2>
+          
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">What is SECA Tax?</h3>
+              <p className="text-slate-600 text-sm leading-relaxed">
+                SECA (Self-Employment Contributions Act) tax is a 15.3% tax levied on the net earnings of independent contractors, freelancers, and sole proprietors. It covers Social Security (12.4% up to the 2026 wage base limit of $184,500) and Medicare (2.9%). Unlike W-2 employees who split this cost with their employer, 1099 workers are responsible for the full amount.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">How does an LLC or S-Corp reduce taxes?</h3>
+              <p className="text-slate-600 text-sm leading-relaxed">
+                By structuring your business as an LLC with an S-Corporation tax election, you can divide your business income into two streams: a "reasonable W-2 salary" and "owner distributions." You only pay the 15.3% SECA tax on the W-2 salary portion, legally shielding your remaining distributions from this heavy tax burden.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">What is the 2026 QBI Deduction?</h3>
+              <p className="text-slate-600 text-sm leading-relaxed">
+                The Qualified Business Income (QBI) deduction, established under Section 199A, allows eligible self-employed individuals and small business owners to deduct up to 20% of their qualified business income from their federal taxes. Our engine calculates this automatically based on the latest 2026 IRS phase-out thresholds.
+              </p>
+            </div>
+          </div>
         </div>
 
       </div>
