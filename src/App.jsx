@@ -1,250 +1,138 @@
-import { useState, useMemo } from 'react';
-import { Calculator, TrendingUp, ShieldCheck } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { useState, useEffect } from 'react';
 
 export default function App() {
-  const [revenue, setRevenue] = useState(125000);
-  const [expenses, setExpenses] = useState(25000);
+  // 1. URL Sync & Local Storage Initialization
+  const [revenue, setRevenue] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('rev') || localStorage.getItem('omni_rev') || '125000';
+  });
+  
+  const [expenses, setExpenses] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('exp') || localStorage.getItem('omni_exp') || '25000';
+  });
 
-  const taxLedger = useMemo(() => {
-    const netProfit = Math.max(0, revenue - expenses);
-
-    const taxableSEIncome = netProfit * 0.9235;
-    const ssTax = Math.min(taxableSEIncome, 184500) * 0.124;
-    const medicareTax = taxableSEIncome * 0.029;
-    const secaTax = ssTax + medicareTax;
-    const halfSEDeduction = secaTax / 2;
-
-    const qbiBase = Math.max(0, netProfit - halfSEDeduction);
-    const qbiDeduction = Math.max(0, qbiBase * 0.20);
-
-    const standardDeduction = 16100;
-
-    const taxableIncome = Math.max(0, netProfit - halfSEDeduction - qbiDeduction - standardDeduction);
+  // 2. Sync State Changes to Local Storage & URL
+  useEffect(() => {
+    localStorage.setItem('omni_rev', revenue);
+    localStorage.setItem('omni_exp', expenses);
     
-    const brackets = [
-      { rate: 0.10, limit: 11925 },
-      { rate: 0.12, limit: 48475 },
-      { rate: 0.22, limit: 103350 },
-      { rate: 0.24, limit: 197300 }
-    ];
-
-    let federalIncomeTax = 0;
-    let remainingIncome = taxableIncome;
-    let previousLimit = 0;
-
-    for (const bracket of brackets) {
-      const taxableInBracket = Math.min(remainingIncome, bracket.limit - previousLimit);
-      if (taxableInBracket > 0) {
-        federalIncomeTax += taxableInBracket * bracket.rate;
-        remainingIncome -= taxableInBracket;
-        previousLimit = bracket.limit;
-      } else {
-        break;
-      }
-    }
-
-    const totalTaxOwed = secaTax + federalIncomeTax;
-    const netTakeHome = netProfit - totalTaxOwed;
-    const totalTaxShield = expenses + halfSEDeduction + qbiDeduction + standardDeduction;
-
-    return {
-      netProfit,
-      secaTax,
-      halfSEDeduction,
-      qbiDeduction,
-      standardDeduction,
-      federalIncomeTax,
-      totalTaxOwed,
-      netTakeHome,
-      totalTaxShield
-    };
+    // Updates the URL seamlessly so users can share their specific ledger (Virality Engine)
+    const newUrl = `${window.location.pathname}?rev=${revenue}&exp=${expenses}`;
+    window.history.replaceState({}, '', newUrl);
   }, [revenue, expenses]);
 
-  const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+  // 3. Tax Logic & Math Validation (Prevents NaN crashes)
+  const safeRev = Number(revenue) || 0;
+  const safeExp = Number(expenses) || 0;
+  const netProfit = Math.max(0, safeRev - safeExp);
+  
+  // Sole Prop SECA Tax (15.3% on 92.35% of net profit)
+  const solePropSECA = netProfit * 0.9235 * 0.153;
+  
+  // S-Corp logic (Assuming reasonable W-2 salary is 40% of net profit)
+  const reasonableSalary = netProfit * 0.40;
+  const sCorpSECA = reasonableSalary * 0.153;
+  
+  const taxSavings = solePropSECA - sCorpSECA;
 
-  const chartData = [
-    { name: 'Net Take-Home', value: taxLedger.netTakeHome, color: '#10b981' },
-    { name: 'SECA Tax', value: taxLedger.secaTax, color: '#3b82f6' },
-    { name: 'Federal Tax', value: taxLedger.federalIncomeTax, color: '#f59e0b' }
-  ];
+  // 4. Awin Affiliate Tracking with Sub-ID Parameter
+  const affiliateLink = "https://www.northwestregisteredagent.com/?a_aid=YOUR_AWIN_ID&clickref=omni_tax_engine_2026";
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-4 font-sans transition-colors duration-300">
+      <div className="max-w-3xl mx-auto bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 md:p-8 my-8 border border-slate-200 dark:border-slate-700">
         
-        {/* Header */}
-        <div className="flex items-center space-x-3">
-          <Calculator className="w-8 h-8 text-blue-600" />
+        {/* Header & Print-to-PDF Button */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">2026 SECA Tax Engine</h1>
+          <button 
+            onClick={() => window.print()}
+            className="hidden md:inline-block px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-sm font-semibold transition-colors print:hidden"
+            aria-label="Export Tax Ledger to PDF"
+          >
+            Export to PDF
+          </button>
+        </div>
+        
+        {/* FTC Legal Compliance Shield */}
+        <p className="text-sm italic text-slate-500 dark:text-slate-400 mb-8 print:hidden">
+          *We may earn a commission if you purchase through our partner links. This does not constitute legal or tax advice.
+        </p>
+
+        {/* Inputs (with numeric keypads for mobile friction reduction) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 print:hidden">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Omni Digital Tax Engine</h1>
-            <p className="text-slate-500 text-xs md:text-sm mt-1">Real-time 2026 IRS 1099 Liability & QBI Modeling</p>
+            <label className="block text-sm font-semibold mb-2">Annual 1099 Revenue ($)</label>
+            <input 
+              type="text" 
+              inputMode="numeric"
+              value={revenue} 
+              onChange={(e) => setRevenue(e.target.value.replace(/[^0-9]/g, ''))}
+              className="w-full p-3 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+              aria-describedby="revenue-help"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold mb-2">Business Expenses ($)</label>
+            <input 
+              type="text" 
+              inputMode="numeric"
+              value={expenses} 
+              onChange={(e) => setExpenses(e.target.value.replace(/[^0-9]/g, ''))}
+              className="w-full p-3 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+              aria-describedby="expenses-help"
+            />
           </div>
         </div>
 
-        {/* Calculator Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-              <div className="flex items-center space-x-2 mb-6">
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
-                <h2 className="font-semibold text-slate-800">Business Metrics</h2>
-              </div>
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Gross 1099 Revenue</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-slate-500">$</span>
-                    <input 
-                      type="number" 
-                      value={revenue}
-                      onChange={(e) => setRevenue(Number(e.target.value))}
-                      className="w-full pl-8 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Operating Expenses (Write-offs)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2 text-slate-500">$</span>
-                    <input 
-                      type="number" 
-                      value={expenses}
-                      onChange={(e) => setExpenses(Number(e.target.value))}
-                      className="w-full pl-8 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    />
-                  </div>
-                </div>
-              </div>
+        {/* Results Ledger */}
+        <div className="bg-slate-100 dark:bg-slate-900 rounded-lg p-6 mb-8 border border-slate-200 dark:border-slate-700">
+          <h2 className="text-xl font-bold border-b border-slate-300 dark:border-slate-700 pb-2 mb-4">Tax Ledger Breakdown</h2>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span>Net Profit:</span>
+              <span className="font-mono font-semibold">${netProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
-
-            <div className="bg-blue-600 p-6 rounded-xl shadow-sm text-white">
-              <div className="flex items-center space-x-2 mb-4">
-                <ShieldCheck className="w-5 h-5 opacity-90" />
-                <h2 className="font-semibold text-blue-50 tracking-wide text-sm">TOTAL TAX SHIELD</h2>
-              </div>
-              <div className="text-3xl font-bold mb-3">{formatCurrency(taxLedger.totalTaxShield)}</div>
-              <p className="text-blue-100 text-sm leading-relaxed">
-                Money protected from federal taxes via write-offs, the 20% QBI deduction, and standard deductions.
-              </p>
+            <div className="flex justify-between text-red-600 dark:text-red-400">
+              <span>Sole Prop SECA Tax (15.3%):</span>
+              <span className="font-mono font-semibold">-${solePropSECA.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
-          </div>
-
-          <div className="lg:col-span-2 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center">
-                <div className="text-xs font-bold text-slate-500 mb-1 tracking-wider uppercase">Net Profit</div>
-                <div className="text-xl font-bold text-slate-800">{formatCurrency(taxLedger.netProfit)}</div>
-              </div>
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-red-100 text-center">
-                <div className="text-xs font-bold text-slate-500 mb-1 tracking-wider uppercase">Total Tax Owed</div>
-                <div className="text-xl font-bold text-red-500">{formatCurrency(taxLedger.totalTaxOwed)}</div>
-              </div>
-              <div className="bg-white p-4 rounded-xl shadow-sm border border-emerald-100 text-center">
-                <div className="text-xs font-bold text-slate-500 mb-1 tracking-wider uppercase">Net Take-Home</div>
-                <div className="text-xl font-bold text-emerald-500">{formatCurrency(taxLedger.netTakeHome)}</div>
-              </div>
+            <div className="flex justify-between text-blue-600 dark:text-blue-400">
+              <span>S-Corp SECA Tax (W2 Only):</span>
+              <span className="font-mono font-semibold">-${sCorpSECA.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center">
-              <div className="w-full md:w-1/2 h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      formatter={(value) => formatCurrency(value)}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="w-full md:w-1/2 space-y-4 md:pl-8 mt-6 md:mt-0 w-full">
-                <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2">2026 IRS Ledger Breakdown</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between items-center text-slate-600">
-                    <span>SECA Tax (15.3%)</span>
-                    <span className="font-medium">{formatCurrency(taxLedger.secaTax)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-emerald-600">
-                    <span>Half-SE Deduction</span>
-                    <span>-{formatCurrency(taxLedger.halfSEDeduction)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-emerald-600">
-                    <span>QBI Deduction (20%)</span>
-                    <span>-{formatCurrency(taxLedger.qbiDeduction)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-emerald-600">
-                    <span>Standard Deduction</span>
-                    <span>-{formatCurrency(taxLedger.standardDeduction)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-slate-800 font-bold border-t border-slate-100 pt-2 mt-2">
-                    <span>Federal Income Tax</span>
-                    <span>{formatCurrency(taxLedger.federalIncomeTax)}</span>
-                  </div>
-                </div>
-              </div>
+            <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold text-lg pt-4 border-t border-slate-300 dark:border-slate-700">
+              <span>S-Corp Tax Shield Savings:</span>
+              <span className="font-mono">${taxSavings.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
             </div>
           </div>
         </div>
 
-        {/* Monetization CTA */}
-        <div className="mt-8 bg-blue-50 p-6 md:p-8 rounded-xl shadow-sm border border-blue-100 text-center">
-          <h3 className="text-xl font-bold text-slate-800 mb-2">Ready to lock in these tax savings?</h3>
-          <p className="text-slate-600 mb-6 max-w-2xl mx-auto">
-            Structuring as an LLC or S-Corp is the most effective way to shield your self-employment income from excess SECA taxes. Don't risk IRS compliance flags by filing manually.
-          </p>
+        {/* Call to Action - Desktop */}
+        <div className="text-center print:hidden hidden md:block">
+          <p className="mb-4 font-medium">Capture these savings by structuring as an LLC today.</p>
           <a 
-            href="https://www.awin1.com/cread.php?awinmid=66946&awinaffid=2775906" 
+            href={affiliateLink}
             target="_blank" 
             rel="noopener noreferrer"
-            className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors shadow-md"
+            className="inline-block w-full md:w-auto px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-transform transform hover:scale-105 shadow-lg"
           >
-            Form Your LLC Properly Today (Sponsored Partner)
+            Form Your LLC for $39
           </a>
         </div>
+      </div>
 
-        {/* SEO & FAQ Section */}
-        <div className="mt-12 bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 text-left">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6">2026 Freelance & 1099 Tax Guide</h2>
-          
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-800 mb-2">What is SECA Tax?</h3>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                SECA (Self-Employment Contributions Act) tax is a 15.3% tax levied on the net earnings of independent contractors, freelancers, and sole proprietors. It covers Social Security (12.4% up to the 2026 wage base limit of $184,500) and Medicare (2.9%). Unlike W-2 employees who split this cost with their employer, 1099 workers are responsible for the full amount.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold text-slate-800 mb-2">How does an LLC or S-Corp reduce taxes?</h3>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                By structuring your business as an LLC with an S-Corporation tax election, you can divide your business income into two streams: a "reasonable W-2 salary" and "owner distributions." You only pay the 15.3% SECA tax on the W-2 salary portion, legally shielding your remaining distributions from this heavy tax burden.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold text-slate-800 mb-2">What is the 2026 QBI Deduction?</h3>
-              <p className="text-slate-600 text-sm leading-relaxed">
-                The Qualified Business Income (QBI) deduction, established under Section 199A, allows eligible self-employed individuals and small business owners to deduct up to 20% of their qualified business income from their federal taxes. Our engine calculates this automatically based on the latest 2026 IRS phase-out thresholds.
-              </p>
-            </div>
-          </div>
-        </div>
-
+      {/* Conversion Rate Optimization: Mobile Sticky CTA */}
+      <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-800 p-4 border-t border-slate-200 dark:border-slate-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] md:hidden print:hidden z-50">
+          <a 
+            href={affiliateLink}
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="block w-full text-center px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-md"
+          >
+            Form LLC & Save ${Math.round(taxSavings).toLocaleString()}
+          </a>
       </div>
     </div>
   );
